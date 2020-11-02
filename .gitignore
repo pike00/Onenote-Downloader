@@ -149,3 +149,10 @@ out
 gen
 /keys/
 /venv/
+*.json
+
+*.png
+
+*.html
+
+*.inkml
