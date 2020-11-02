@@ -6,14 +6,14 @@ from os import makedirs
 from furl import furl
 
 from definitions import *
-from main.helpers import *
+from onenote_dl.helpers import download_and_save_json_to_file
 
 f = furl(GRAPH_URL)
 f /= "notebooks"
 
-# Download and write the notebooks json to the main json folder
+# Download and write the notebooks json to the onenote_dl json folder
 notebooks_js = download_and_save_json_to_file([OUT_DIR, "notebooks.json"], f.url)
-
+exit()
 # Loop over each notebook
 for notebook_js in notebooks_js:
     notebook_id = notebook_js['id']

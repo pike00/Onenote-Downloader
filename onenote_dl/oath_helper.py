@@ -13,7 +13,7 @@ from furl import furl
 from OAuth.OAuthHTTPRequestHandler import OAuthHTTPRequestHandler
 from OAuth.OAuthHTTPServer import OAuthHTTPServer
 from definitions import *
-import main.helpers
+import onenote_dl.helpers
 from definitions import TOKEN_URL, AUTHORIZATION_URL
 
 config_file = open(CONFIG_PATH, 'r')
@@ -88,5 +88,5 @@ def get_token():
 
     # noinspection PyUnboundLocalVariable
     # Set headers_auth to access_token from token_js
-    main.helpers.headers_auth = {"Authorization": f"Bearer {token_js['access_token']}"}
+    onenote_dl.helpers.headers_auth = {"Authorization": f"Bearer {token_js['access_token']}"}
 
