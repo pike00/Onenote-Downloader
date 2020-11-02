@@ -1,11 +1,14 @@
-import requests
-
+import re
+from os import makedirs
 
 
 # Get Notebooks URL
 from furl import furl
 
-f = furl(graph_url)
+from definitions import *
+from main.helpers import *
+
+f = furl(GRAPH_URL)
 f /= "notebooks"
 
 # Download and write the notebooks json to the main json folder
