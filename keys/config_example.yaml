@@ -1,0 +1,9 @@
+oauth:
+  client_id: '##################################'
+  client_secret: ''##################################''
+  scope: 'notes.read.all'
+  urls:
+    authorization_endpoint: 'https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize'
+    token_endpoint: 'https://login.microsoftonline.com/organizations/oauth2/v2.0/token'
+
+graph_url: "https://graph.microsoft.com/v1.0/me/onenote/"
