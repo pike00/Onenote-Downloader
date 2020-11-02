@@ -147,7 +147,11 @@ cython_debug/
 *.iml
 out
 gen
-/keys/
+
+# Keys
+!/keys/config_example.yaml
+/keys/config.yaml
+
 /venv/
 *.json
 
