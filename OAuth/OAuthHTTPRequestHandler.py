@@ -41,4 +41,6 @@ class OAuthHTTPRequestHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "text/html")
 
-        self.wfile.write(str.encode(self.server.get_code()))
+        response = re.sub("<code>", self.server.get_code(), response)
+
+        self.wfile.write(str.encode(response))

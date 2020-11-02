@@ -26,10 +26,10 @@ scope = config['oauth']['scope']
 has_valid_token = False
 
 
-def _get_token(refresh=False):
+def _get_token():
     # If the token file exists, just load that
     global has_valid_token
-    if os.path.exists(TOKEN_PATH) and not refresh:
+    if os.path.exists(TOKEN_PATH):
         with open(TOKEN_PATH, "r") as file:
             token_js = json.loads(file.read())
 
@@ -47,7 +47,7 @@ def _get_token(refresh=False):
             os.remove(TOKEN_PATH)
         # if token_js.get("expiration")
 
-    if not has_valid_token or refresh:  # Otherwise get a new token
+    if not has_valid_token:  # Otherwise get a new token
         client = OAuth2Session(client_id, client_secret, scope=scope)
 
         uri, state = client.create_authorization_url(AUTHORIZATION_URL)
@@ -96,4 +96,4 @@ def refresh_token():
     if has_valid_token:
         return
     else:
-        _get_token(refresh=True)
+        _get_token()

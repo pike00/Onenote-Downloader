@@ -3,7 +3,7 @@ from os.path import join, exists
 
 import requests
 
-from onenote_dl.oath_helper import _get_token, refresh_token
+from OAuth.oath_helper import refresh_token
 
 headers_auth = ""
 
