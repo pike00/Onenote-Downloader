@@ -66,11 +66,12 @@ for notebook_js in notebooks_js:
                     asset = download_and_write_binary_to_file(asset_filename, asset_url)
 
                 # Replace the page html that has the asset_urls with the filenames for local loading
-                page_html = page_html.replace(asset_url, asset_filename)
+                page_html = page_html.replace(asset_url, asset_filename.split("\\")[-1])
 
             # Now save page html to page folder
             with open(join(page_dir, "page.html"), "w") as file:
                 file.write(page_html)
+                print(f"Wrote {page_id}.html")
 
                 # img_tags = re.findall(r'<img (.*) />', content)
             # for img_tag in img_tags:
