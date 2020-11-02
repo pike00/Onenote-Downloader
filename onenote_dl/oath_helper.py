@@ -23,11 +23,13 @@ client_id = config['oauth']['client_id']
 client_secret = config['oauth']['client_secret']
 scope = config['oauth']['scope']
 
+has_valid_token = False
 
-def get_token():
-    has_valid_token = False
+
+def _get_token(refresh=False):
     # If the token file exists, just load that
-    if os.path.exists(TOKEN_PATH):
+    global has_valid_token
+    if os.path.exists(TOKEN_PATH) and not refresh:
         with open(TOKEN_PATH, "r") as file:
             token_js = json.loads(file.read())
 
@@ -45,7 +47,7 @@ def get_token():
             os.remove(TOKEN_PATH)
         # if token_js.get("expiration")
 
-    if not has_valid_token:  # Otherwise get a new token
+    if not has_valid_token or refresh:  # Otherwise get a new token
         client = OAuth2Session(client_id, client_secret, scope=scope)
 
         uri, state = client.create_authorization_url(AUTHORIZATION_URL)
@@ -72,7 +74,6 @@ def get_token():
             "grant_type": "authorization_code",
             "code": code,
             "client_secret": client_secret
-            # "redirect_url": "http://localhost/onenote_downloader"
         }
 
         token_js = requests.post(token_request_url.url, data=data).content
@@ -90,3 +91,9 @@ def get_token():
     # Set headers_auth to access_token from token_js
     onenote_dl.helpers.headers_auth = {"Authorization": f"Bearer {token_js['access_token']}"}
 
+
+def refresh_token():
+    if has_valid_token:
+        return
+    else:
+        _get_token(refresh=True)

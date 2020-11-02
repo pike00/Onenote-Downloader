@@ -3,15 +3,19 @@ from os.path import join, exists
 
 import requests
 
+from onenote_dl.oath_helper import _get_token, refresh_token
+
 headers_auth = ""
 
 
 def get_graph_page(req_url):
+    refresh_token()
     return requests.get(req_url, headers=headers_auth).content.decode("utf-8")
 
 
 # Returns json_content
 def download_and_save_json_to_file(filename_array, req_url, overwrite=False) -> json:
+    refresh_token()
     json_content = json.loads(get_graph_page(req_url))['value']
 
     filename = ""
@@ -38,6 +42,7 @@ def download_and_save_json_to_file(filename_array, req_url, overwrite=False) -> 
 
 
 def download_and_write_binary_to_file(filename, req_url):
+    refresh_token()
     with open(filename, "wb") as file:
         result = requests.get(req_url, headers=headers_auth)
 
