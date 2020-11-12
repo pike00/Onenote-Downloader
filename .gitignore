@@ -160,3 +160,5 @@ gen
 *.html
 
 *.inkml
+
+inkml_parser/img/
