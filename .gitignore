@@ -162,3 +162,5 @@ gen
 *.inkml
 
 inkml_parser/img/
+
+*.db
