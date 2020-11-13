@@ -1,15 +1,18 @@
+from enum import Enum
+
 import pandas as pd
-import sqlalchemy as db
 from hashable_df import hashable_df
+import sqlalchemy as db
 from sqlalchemy import String, Column, Table
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import Session
 
 from definitions import DATABASE_PATH
-from onenote_classes.onenoteobject import *
 
-print("In DB Helper")
 engine = db.create_engine(f'sqlite:///{DATABASE_PATH}', echo=False)
 connection = engine.connect()
+
+session = Session(bind=engine)
 
 Base = declarative_base()
 
@@ -22,29 +25,54 @@ class Notebook(Base):
     displayName = Column(String)
     lastModifiedDateTime = Column(String)
 
+    def get_dictionary(self):
+        return {'id': self.id,
+                'createdDateTime': self.createdDateTime,
+                'displayName': self.displayName,
+                'lastModifiedDateTime': self.lastModifiedDateTime}
+
     def __str__(self) -> str:
         return f"Notebook: {self.displayName} ({self.id})"
 
 
-sections_table = Table(
-    "sections",
-    Base.metadata,
-    Column("id", String, primary_key=True),
-    Column("createdDateTime", String),
-    Column("displayName", String),
-    Column("lastModifiedDateTime", String),
-    Column("parentNotebookID", String)
-)
+class Section(Base):
+    __tablename__ = "sections"
 
-pages_table = Table(
-    "pages",
-    Base.metadata,
-    Column("id", String, primary_key=True),
-    Column("createdDateTime", String),
-    Column("displayName", String),
-    Column("lastModifiedDateTime", String),
-    Column("parentNotebookID", String)
-)
+    id = Column(String, primary_key=True)
+    createdDateTime = Column(String)
+    displayName = Column(String)
+    lastModifiedDateTime = Column(String)
+    parentNotebookID = Column(String)
+
+    def get_dictionary(self):
+        return {'id': self.id,
+                'createdDateTime': self.createdDateTime,
+                'displayName': self.displayName,
+                'lastModifiedDateTime': self.lastModifiedDateTime,
+                'parentNotebookID': self.parentNotebookID}
+
+    def __str__(self) -> str:
+        return f"Section: {self.displayName} ({self.id})"
+
+class Page(Base):
+    __tablename__ = "pages"
+
+    id = Column(String, primary_key=True)
+    createdDateTime = Column(String)
+    displayName = Column(String)
+    lastModifiedDateTime = Column(String)
+    parentSectionID = Column(String)
+
+    def get_dictionary(self):
+        return {'id': self.id,
+                'createdDateTime': self.createdDateTime,
+                'displayName': self.displayName,
+                'lastModifiedDateTime': self.lastModifiedDateTime,
+                'parentSectionID': self.parentSectionID}
+
+    def __str__(self) -> str:
+        return f"Page: {self.displayName} ({self.id})"
+
 
 Base.metadata.create_all(engine)
 
@@ -66,34 +94,6 @@ class OneNoteType(Enum):
 # print("id db helper")
 
 
-# Saves data to table in database, connecting if necessary
-def save_table_to_db(dataFrame, tableName, overwrite=False):
-    connect_to_db()
-
-    # IF overwrite is positive, erase old data and re-write in place
-    if overwrite:
-        dataFrame.to_sql(tableName, connection, if_exists='replace', index=False)
-    # Otherwise, if the table_exists, read the old data and combine , dropping duplicates
-    elif table_exists(tableName):
-        old_df = read_table_from_sql(tableName)
-        combined_df = hashable_df(pd.concat([old_df, dataFrame], ignore_index=True)).drop_duplicates()
-
-        # Serialize
-        combined_df.to_sql(tableName, connection, if_exists='replace', index=False)
-    else:  # Overwrite is false, and table doesn't exist
-        # Write to sql for the first time
-        # if_exists='fail' is just a double check, and shouldn't ever fail based on the logic above
-        dataFrame.to_sql(tableName, connection, if_exists='fail', index=False)
-
-
-def add_entry(dataFrame, tableName):
-    connect_to_db()
-
-
-def close_connection_to_db():
-    connection.close()
-
-
 def parseJSON(json_content, objectType: OneNoteType):
     params = {}
 
@@ -109,8 +109,37 @@ def parseJSON(json_content, objectType: OneNoteType):
     elif objectType == OneNoteType.SECTION:
         params['displayName'] = json_content.get('displayName')
         params['parentNotebookID'] = json_content.get('parentNotebook').get('id')
+
+        return Section(**params)
     elif objectType == OneNoteType.PAGE:
         params['displayName'] = json_content.get('title')
         params['parentSectionID'] = json_content.get('parentSection').get('id')
 
-    return
+        return Page(**params)
+
+
+def update_row(onenoteobject):
+    onenoteobjectclass = onenoteobject.__class__
+    results = session.query(onenoteobjectclass).filter(onenoteobjectclass.id == onenoteobject.id)
+    if results.count() == 1:
+        results.update(onenoteobject.get_dictionary())
+    elif results.count() == 0:
+        session.add(onenoteobject)
+    else:
+        raise IndexError(f"More than one row exists for this Object id {onenoteobject.id} (Class: {onenoteobjectclass}")
+
+    session.commit()
+
+# def update_section(section):
+#     results = session.query(Section).filter(Section.id == section.id)
+#     if results.count() == 1:
+#         old_notebook = results.first()
+#         old_notebook.createdDateTime = notebook.createdDateTime
+#         old_notebook.displayName = notebook.displayName
+#         old_notebook.lastModifiedDateTime = notebook.lastModifiedDateTime
+#     elif results.count() == 0:
+#         session.add(notebook)
+#     else:
+#         raise IndexError(f"More than one row exists for this Notebook id {notebook.id}")
+#
+#     session.commit()
