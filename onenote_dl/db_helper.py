@@ -95,12 +95,12 @@ class OneNoteType(Enum):
 
 
 def parseJSON(json_content, objectType: OneNoteType):
-    params = {}
+    params = {'id': json_content['id']}
 
-    for key, value in {'id': 'id',
-                       'createdDateTime': 'createdDateTime',
-                       'lastModifiedDateTime': 'lastModifiedDateTime'}.items():
-        params[key] = json_content[value]
+    # for key, value in {'id': 'id',
+    #                    'createdDateTime': 'createdDateTime',
+    #                    'lastModifiedDateTime': 'lastModifiedDateTime'}.items():
+    #     params[key] = json_content[value]
 
     if objectType == OneNoteType.NOTEBOOK:
         params['displayName'] = json_content.get('displayName')
@@ -113,7 +113,6 @@ def parseJSON(json_content, objectType: OneNoteType):
         return Section(**params)
     elif objectType == OneNoteType.PAGE:
         params['displayName'] = json_content.get('title')
-        params['parentSectionID'] = json_content.get('parentSection').get('id')
 
         return Page(**params)
 

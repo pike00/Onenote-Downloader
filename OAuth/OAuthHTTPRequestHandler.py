@@ -14,9 +14,7 @@ class OAuthHTTPRequestHandler(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
-        response = """Content-type: text/html
-
-            <html>
+        response = """<html>
             <head>
             <title>Authorization Complete</title>
             </head>
@@ -27,8 +25,12 @@ class OAuthHTTPRequestHandler(BaseHTTPRequestHandler):
             </body>
             </html>
             """
+
         self.send_response(200)
+        self.send_header("Content-type", "text/html")
         self.end_headers()
+
+        self.wfile.write(response.encode())
 
         f = furl(self.path)
 
@@ -42,5 +44,3 @@ class OAuthHTTPRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-type", "text/html")
 
         response = re.sub("<code>", self.server.get_code(), response)
-
-        self.wfile.write(str.encode(response))

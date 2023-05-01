@@ -26,7 +26,7 @@ scope = config['oauth']['scope']
 has_valid_token = False
 
 
-def _get_token():
+def _get_token(force=False):
     # If the token file exists, just load that
     global has_valid_token
     if os.path.exists(TOKEN_PATH):
@@ -45,9 +45,8 @@ def _get_token():
         # If there isn't a valid token/expiration has passed, remove the token
         if not has_valid_token:
             os.remove(TOKEN_PATH)
-        # if token_js.get("expiration")
 
-    if not has_valid_token:  # Otherwise get a new token
+    if not has_valid_token or force:  # Otherwise get a new token
         client = OAuth2Session(client_id, client_secret, scope=scope)
 
         uri, state = client.create_authorization_url(AUTHORIZATION_URL)
@@ -92,8 +91,8 @@ def _get_token():
     onenote_dl.helpers.headers_auth = {"Authorization": f"Bearer {token_js['access_token']}"}
 
 
-def refresh_token():
-    if has_valid_token:
+def refresh_token(force=False):
+    if has_valid_token and not force:
         return
     else:
-        _get_token()
+        _get_token(force)
