@@ -17,3 +17,10 @@ Microsoft provides [Microsoft Graph](https://developer.microsoft.com/en-us/graph
 
 ### InkML
 OneNote saves ink annotations as [InkML](https://www.w3.org/TR/InkML/), which currently has a specification from W3C as of 2011-09-20, so quite out dated. I have not managed to find any javascript libraries that can render this code, so I have tried to write my own (incomplete).
+
+
+
+## Todo
+
+- [x] Download all files, including attachments, media, annotations
+- [ ] Regenerate annotated documents and save as PDF for external viewing/archiving
