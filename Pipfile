@@ -17,6 +17,7 @@ pandas = "*"
 sqlalchemy = "*"
 tqdm = "*"
 beautifulsoup4 = "*"
+urllib3 = "*"
 
 [dev-packages]
 
