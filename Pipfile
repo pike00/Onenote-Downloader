@@ -1,0 +1,24 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+requests = "*"
+pyyaml = "*"
+authlib = "*"
+python-dateutil = "*"
+furl = "*"
+numpy = "*"
+matplotlib = "*"
+scikit-image = "*"
+scipy = "*"
+pandas = "*"
+sqlalchemy = "*"
+tqdm = "*"
+beautifulsoup4 = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.11"
