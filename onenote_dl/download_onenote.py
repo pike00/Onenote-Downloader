@@ -62,7 +62,7 @@ for notebook_js in notebooks_js:
 
             # Find resource urls within each page
             # Includes images
-            asset_urls = re.findall(r'"(https?://graph.microsoft.com.+?\$value)"', page_html)
+            asset_urls = re.findall(r'"(https?://graph\.microsoft.com.+?\$value)"', page_html)
 
             if len(asset_urls) == 0:
                 continue
