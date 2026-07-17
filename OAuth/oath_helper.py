@@ -33,7 +33,7 @@ def _get_token(force=False):
         with open(TOKEN_PATH, "r") as file:
             token_js = json.loads(file.read())
 
-        if 'expiration' in token_js:
+        if 'expiration' in token_js and 'access_token' in token_js:
             expiration_datetime = parser.parse(token_js['expiration'])
             if expiration_datetime > datetime.datetime.now():
                 has_valid_token = True
@@ -44,40 +44,49 @@ def _get_token(force=False):
 
         # If there isn't a valid token/expiration has passed, remove the token
         if not has_valid_token:
-            os.remove(TOKEN_PATH)
+            try:
+                os.remove(TOKEN_PATH)
+            except OSError:
+                pass
 
     if not has_valid_token or force:  # Otherwise get a new token
         client = OAuth2Session(client_id, client_secret, scope=scope)
 
-        uri, state = client.create_authorization_url(AUTHORIZATION_URL)
+        uri, state = client.create_authorization_url(AUTHORIZATION_URL, redirect_uri="http://localhost:8085/onenote_downloader")
+        print(f"\nAuthorization URL: {uri}\n", flush=True)
         webbrowser.open(uri, new=2)
 
-        httpd = OAuthHTTPServer(('localhost', 80), OAuthHTTPRequestHandler)
+        httpd = OAuthHTTPServer(('localhost', 8085), OAuthHTTPRequestHandler)
 
         t = threading.Thread(target=httpd.serve_forever)
         t.start()
 
+        import time
         while not httpd.has_authorization_code():
-            pass
+            time.sleep(0.5)
 
         httpd.shutdown()
 
-        code = quote_plus(httpd.get_code())
+        code = httpd.get_code()
 
         token_request_url = furl(TOKEN_URL)
-        token_request_url.args['redirect_uri'] = "http://localhost/onenote_downloader"
+        token_request_url.args['redirect_uri'] = "http://localhost:8085/onenote_downloader"
 
         data = {
             "scope": scope,
             "client_id": client_id,
             "grant_type": "authorization_code",
             "code": code,
-            "client_secret": client_secret
+            "client_secret": client_secret,
+            "redirect_uri": "http://localhost:8085/onenote_downloader"
         }
 
         token_js = requests.post(token_request_url.url, data=data).content
 
         token_js = json.loads(token_js.decode("utf-8"))
+
+        if 'access_token' not in token_js:
+            raise ValueError(f"Failed to obtain access token from Microsoft Graph API: {token_js.get('error_description', token_js)}")
 
         expiration = datetime.datetime.now() + datetime.timedelta(hours=1)
 

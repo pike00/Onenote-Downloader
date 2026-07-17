@@ -18,8 +18,8 @@ notebooks_js = get_json_notebook_section(join(definitions.OUT_DIR, "notebooks.js
 
 for notebook_js in notebooks_js:
     notebook = parseJSON(json_content=notebook_js, objectType=OneNoteType.NOTEBOOK)
-    # if notebook.id != '1-957d9a86-d5f9-4a39-83c9-cf7415928045':
-    #     continue
+    if "01 sfi" not in notebook.displayName.lower():
+        continue
     print(f"\n\n------NOTEBOOK: {notebook.displayName}------")
     # update_row(notebook)
 

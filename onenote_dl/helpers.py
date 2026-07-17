@@ -10,6 +10,10 @@ from tqdm import tqdm
 from OAuth.oath_helper import refresh_token
 
 headers_auth = ""
+LAST_REQUEST_TIME = 0
+MIN_REQUEST_INTERVAL = 8.0  # start highly conservative to avoid 429 penalty box
+SUCCESS_STREAK = 0
+SESSION = requests.Session()
 
 
 def get_html(filename, req_url, forceDownload=False):
@@ -121,21 +125,57 @@ def get_binary_file(filename, req_url, forceDownload=False):
 
 
 def download(request_url):
+    global LAST_REQUEST_TIME, MIN_REQUEST_INTERVAL, SUCCESS_STREAK
     req = None
+    backoff = 10
 
-    iteration = 60
+    while True:
+        # Respect rate limits by maintaining a minimum interval between requests
+        now = time.time()
+        elapsed = now - LAST_REQUEST_TIME
+        if elapsed < MIN_REQUEST_INTERVAL:
+            time.sleep(MIN_REQUEST_INTERVAL - elapsed)
 
-    while req is None or req.status_code != 200:
-        req = requests.get(request_url, headers=headers_auth)
+        refresh_token()
+
+        try:
+            LAST_REQUEST_TIME = time.time()
+            req = SESSION.get(request_url, headers=headers_auth)
+        except Exception as e:
+            print(f"\nRequest failed: {e}. Retrying in {backoff} seconds...", flush=True)
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 60)
+            continue
+
+        if req.status_code == 200:
+            SUCCESS_STREAK += 1
+            # If we run successfully for 30 requests, slowly attempt to decrease interval
+            if SUCCESS_STREAK >= 30:
+                MIN_REQUEST_INTERVAL = max(1.0, MIN_REQUEST_INTERVAL - 0.1)
+                SUCCESS_STREAK = 0
+            return req
 
         if req.status_code == 429:
-            print(f"\nThrottle limit reached. Pausing briefly fonr {iteration} minutes")
-            time.sleep(60 * iteration)
-            # for i in tqdm(range(iteration)):
-            #     time.sleep(60)
+            SUCCESS_STREAK = 0
+            # Increase delay interval dynamically on throttle to back off
+            MIN_REQUEST_INTERVAL = min(15.0, MIN_REQUEST_INTERVAL + 1.0)
 
-            iteration *= 2
+            retry_after = req.headers.get("Retry-After")
+            if retry_after:
+                try:
+                    sleep_time = int(retry_after)
+                except ValueError:
+                    sleep_time = max(1800, backoff)
+            else:
+                sleep_time = max(1800, backoff)
 
+            print(f"\nThrottle limit reached (429) for URL: {request_url}\nResponse body: {req.text}\nHeaders: {dict(req.headers)}\nIncreasing request interval to {MIN_REQUEST_INTERVAL:.1f}s. Pausing for {sleep_time // 60} minutes...", flush=True)
+            time.sleep(sleep_time)
+            backoff = min(backoff * 2, 1800)
+        elif req.status_code == 401:
+            print(f"\nRequest returned status code 401. Refreshing token...", flush=True)
             refresh_token(True)
-
-    return req
+        else:
+            print(f"\nRequest returned status code {req.status_code}. Retrying in {backoff} seconds...", flush=True)
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 120)
