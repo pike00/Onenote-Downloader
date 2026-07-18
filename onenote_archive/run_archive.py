@@ -140,7 +140,7 @@ def run_archive(
     archive_root.mkdir(parents=True, exist_ok=True)
     failures_log = archive_root / "failures.log"
     claimed: dict[Path, str] = {}
-    collected: list[PageRef] = []
+    collected: list[tuple[PageRef, Path]] = []
     processed = 0
     ok_count = 0
     skip_count = 0
@@ -163,7 +163,7 @@ def run_archive(
             failures_log=failures_log,
         )
         if (dest_dir / "page.html").is_file():
-            collected.append(ref)
+            collected.append((ref, dest_dir))
         if outcome == "ok":
             ok_count += 1
         elif outcome == "skip":
@@ -175,7 +175,8 @@ def run_archive(
         if limit is not None and processed >= limit:
             break
 
-    write_indexes(archive_root, collected)
+    refs, dests = zip(*collected, strict=False) if collected else ([], [])
+    write_indexes(archive_root, list(refs), list(dests))
     print(
         f"done: processed={processed} ok={ok_count} skipped={skip_count} failed={fail_count}"
     )
