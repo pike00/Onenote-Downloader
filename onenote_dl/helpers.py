@@ -5,7 +5,6 @@ import random
 
 import requests
 from furl import furl
-from tqdm import tqdm
 
 from OAuth.oath_helper import refresh_token
 

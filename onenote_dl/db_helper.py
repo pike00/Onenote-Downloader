@@ -1,7 +1,5 @@
 from enum import Enum
 
-import pandas as pd
-from hashable_df import hashable_df
 import sqlalchemy as db
 from sqlalchemy import String, Column, Table
 from sqlalchemy.ext.declarative import declarative_base

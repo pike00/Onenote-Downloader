@@ -1,0 +1,20 @@
+[Unit]
+Description=OneNote sync status dashboard (Tailscale-only)
+# User units can't order after system tailscaled; ExecStartPre polls instead.
+StartLimitIntervalSec=0
+
+[Service]
+Type=exec
+WorkingDirectory=/home/will/projects/onenote-downloader
+Environment=PATH=/home/will/projects/onenote-downloader/.venv/bin:/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin
+Environment=ONENOTE_DASHBOARD_PORT=8747
+Environment=ONENOTE_DASHBOARD_REFRESH=5
+# Wait for Tailscale IPv4 (boot race), up to 60s
+ExecStartPre=/bin/sh -c 'for i in $(seq 1 60); do /usr/bin/tailscale ip -4 >/dev/null 2>&1 && exit 0; sleep 1; done; echo "tailscale never came up" >&2; exit 1'
+ExecStart=/bin/sh -c 'export ONENOTE_DASHBOARD_HOST="$(/usr/bin/tailscale ip -4)"; exec /home/will/projects/onenote-downloader/.venv/bin/python -m onenote_dl.dashboard'
+Restart=always
+RestartSec=5
+SyslogIdentifier=onenote-dashboard
+
+[Install]
+WantedBy=default.target

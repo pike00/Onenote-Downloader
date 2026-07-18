@@ -1,4 +1,4 @@
 oauth:
   client_id: '##################################'
   client_secret: ''##################################''
-  scope: 'notes.read.all'
+  scope: 'Notes.Read.All offline_access'
