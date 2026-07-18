@@ -53,3 +53,33 @@ def test_render_path_a_writes_html(tmp_path):
     assert result.html == dest / "page.html"
     assert result.html.read_text(encoding="utf-8").startswith("<html")
     assert (dest / "ink_render.js").is_file()
+
+
+def test_render_path_a_injects_ink_canvas(tmp_path):
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    raw = (
+        "--bound\nContent-Type: text/html\n\n"
+        "<html><head><title>Ink Page</title></head>"
+        "<body><p>content</p></body></html>\n"
+        "--bound\nContent-Type: application/inkml+xml\n\n"
+        '<inkml:ink xmlns:inkml="http://www.w3.org/2003/InkML"></inkml:ink>\n'
+        "--bound--"
+    )
+    page_html = origin / "page.html"
+    page_html.write_text(raw, encoding="utf-8")
+
+    dest = tmp_path / "archive" / "Ink-Page"
+    prepared = prepare_page(page_html, dest)
+    result = render_path_a(prepared, dest, skip_pdf=True)
+
+    assert result.ok
+    assert result.html == dest / "page.html"
+    assert (dest / "ink_render.js").is_file()
+    assert (dest / "ink.inkml").is_file()
+
+    html = result.html.read_text(encoding="utf-8")
+    assert 'id="ink-canvas"' in html
+    assert 'id="inkml-data"' in html
+    assert "ink_render.js" in html
+    assert "<!-- inkml extracted; not rendered in this path -->" in html

@@ -29,6 +29,8 @@ def render_path_a(
     try:
         html = prepared.html_path.read_text(encoding="utf-8")
         inkml = extract_inkml(html)
+        if not inkml and prepared.inkml_path and prepared.inkml_path.is_file():
+            inkml = prepared.inkml_path.read_text(encoding="utf-8")
         width = prepared.width
         height = prepared.height
 
@@ -58,9 +60,16 @@ def render_path_a(
         if not skip_pdf:
             pdf_path = dest_dir / "page.pdf"
             if inkml:
-                html_to_pdf_with_ink_wait(page_html, pdf_path, width, height)
+                pdf_ok = html_to_pdf_with_ink_wait(page_html, pdf_path, width, height)
             else:
-                html_to_pdf(page_html, pdf_path, width, height)
+                pdf_ok = html_to_pdf(page_html, pdf_path, width, height)
+            if not pdf_ok or not pdf_path.is_file():
+                return RenderResult(
+                    ok=False,
+                    html=page_html,
+                    pdf=None,
+                    error="PDF export failed",
+                )
 
         return RenderResult(ok=True, html=page_html, pdf=pdf_path, error=None)
     except Exception as exc:  # noqa: BLE001
