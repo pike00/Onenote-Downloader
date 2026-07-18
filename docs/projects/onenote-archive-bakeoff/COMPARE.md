@@ -16,15 +16,15 @@ Outputs (local, gitignored):
 - [x] Ink alignment vs OneNote (B) — same coordinate math; usable
 - [x] Slides/images look correct (C) — yes; proves Stage‑1 archive
 - [x] PDF usable / zoomable — tall single-page PDFs generated for all three
-- [ ] Winner for full archive: A / B / C / hybrid — **your call**
+- [x] Winner for full archive: **A (browser canvas ink)** — chosen 2026-07-18
 
 ## Observed
 
 - Graph downloads put InkML in a **separate MIME part** after `</html>` — preprocess must parse multipart (fixed in bake-off).
 - Asset URLs contain `users('…')` quotes; naive regex missed them (fixed); assets need `.png` extensions for Chromium.
 - A and B both recover handwritten ink (black/blue/yellow) over lecture slides.
-- C is the right bulk “archive now” path while ink pipeline is refined.
-- Likely full-archive approach: **C for every page immediately**, **A (or B) for ink-heavy pages** / final archival PDFs.
+- C remains useful as a fast no-ink fallback if Playwright/ink fails on a page.
+- **Decision:** Full archive uses path A (self-contained HTML + tall PDF via Playwright).
 
 ## How to re-run
 
