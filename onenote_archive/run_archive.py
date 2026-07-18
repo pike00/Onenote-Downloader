@@ -44,6 +44,17 @@ def _write_page_id(dest_dir: Path, page_id: str) -> None:
     (dest_dir / PAGE_ID_MARKER).write_text(page_id, encoding="utf-8")
 
 
+def _dest_needs_collision_suffix(path: Path, page_id: str, claimed: dict[Path, str]) -> bool:
+    if path in claimed and claimed[path] != page_id:
+        return True
+    if not path.is_dir():
+        return False
+    stored = _read_stored_page_id(path)
+    if stored is None:
+        return True
+    return stored != page_id
+
+
 def resolve_dest_dir(
     archive_root: Path,
     ref: PageRef,
@@ -56,11 +67,7 @@ def resolve_dest_dir(
         / sanitize_title(ref.page_title)
     )
     dest = base
-    stored = _read_stored_page_id(dest) if dest.is_dir() else None
-
-    if dest in claimed and claimed[dest] != ref.page_id:
-        dest = base.parent / f"{base.name}-{page_id_suffix(ref.page_id)}"
-    elif dest.is_dir() and stored is not None and stored != ref.page_id:
+    if _dest_needs_collision_suffix(dest, ref.page_id, claimed):
         dest = base.parent / f"{base.name}-{page_id_suffix(ref.page_id)}"
 
     claimed[dest] = ref.page_id
@@ -125,6 +132,7 @@ def run_archive(
     archive_root: Path,
     *,
     notebook_filter: str | None = None,
+    title_filter: str | None = None,
     skip_pdf: bool = False,
     force: bool = False,
     limit: int | None = None,
@@ -141,9 +149,10 @@ def run_archive(
     for ref in iter_pages(out_dir):
         if notebook_filter and notebook_filter.lower() not in ref.notebook_name.lower():
             continue
+        if title_filter and title_filter.lower() not in ref.page_title.lower():
+            continue
 
         dest_dir = resolve_dest_dir(archive_root, ref, claimed)
-        collected.append(ref)
 
         outcome = _process_page(
             ref,
@@ -153,6 +162,8 @@ def run_archive(
             force=force,
             failures_log=failures_log,
         )
+        if (dest_dir / "page.html").is_file():
+            collected.append(ref)
         if outcome == "ok":
             ok_count += 1
         elif outcome == "skip":
@@ -190,6 +201,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Only process notebooks whose name contains SUBSTR",
     )
     parser.add_argument(
+        "--title",
+        metavar="SUBSTR",
+        help="Only process pages whose title contains SUBSTR",
+    )
+    parser.add_argument(
         "--skip-pdf",
         action="store_true",
         help="Write HTML only; skip Playwright PDF export",
@@ -215,6 +231,7 @@ def main(argv: list[str] | None = None) -> int:
         args.out,
         args.archive,
         notebook_filter=args.notebook,
+        title_filter=args.title,
         skip_pdf=args.skip_pdf,
         force=args.force,
         limit=args.limit,
