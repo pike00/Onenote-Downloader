@@ -29,6 +29,8 @@ OneNote saves ink annotations as [InkML](https://www.w3.org/TR/InkML/), which cu
    uv run onenote_dl/download_onenote.py --notebook "01 sfi"
    ```
 
+   The systemd unit (`deploy/onenote-sync.service`) syncs **all** notebooks by default. Set `ONENOTE_NOTEBOOK_FILTER` in the unit file to restrict scope (see commented example there).
+
 2. **Archive** — render the Graph cache into readable HTML/PDF under `archive/`:
 
    ```bash

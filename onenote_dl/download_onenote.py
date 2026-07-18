@@ -1,4 +1,5 @@
 import argparse
+import os
 import re
 import signal
 import socket
@@ -9,19 +10,12 @@ from os import makedirs
 from os.path import join
 
 from furl import furl
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from tqdm import tqdm
 
 import definitions
 from onenote_dl.db_helper import parseJSON, OneNoteType
 from onenote_dl.helpers import get_json_notebook_section, get_json_page, get_binary_file, get_html
 
-
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="ONENOTE_", extra="ignore")
-
-    notebook_filter: str = Field(default="", description="Sync only notebooks whose name contains this substring")
 
 # tqdm defaults to a multiprocessing.RLock for cross-process write locking.
 # That registers a semaphore with multiprocessing.resource_tracker; a SIGTERM
@@ -154,6 +148,7 @@ if __name__ == "__main__":
         help="Only sync notebooks whose name contains SUBSTR (overrides ONENOTE_NOTEBOOK_FILTER)",
     )
     args = parser.parse_args()
-    settings = Settings()
-    filt = (args.notebook or settings.notebook_filter).strip()
+    filt = os.environ.get("ONENOTE_NOTEBOOK_FILTER", "").strip().lower()
+    if args.notebook is not None:
+        filt = args.notebook.strip().lower()
     main(notebook_filter=filt)

@@ -1,0 +1,21 @@
+[Unit]
+Description=OneNote Downloader sync (Microsoft Graph → local archive)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=exec
+WorkingDirectory=/home/will/projects/onenote-downloader
+Environment=PATH=/home/will/projects/onenote-downloader/.venv/bin:/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin
+# Syncs ALL notebooks unless filtered. To limit scope, uncomment and set a substring:
+# Environment=ONENOTE_NOTEBOOK_FILTER=01 sfi
+ExecStart=/home/will/projects/onenote-downloader/.venv/bin/python -m onenote_dl.download_onenote
+Restart=always
+RestartSec=30
+StandardOutput=append:/home/will/projects/onenote-downloader/onenote_sync.log
+StandardError=append:/home/will/projects/onenote-downloader/onenote_sync.log
+SyslogIdentifier=onenote-sync
+
+[Install]
+WantedBy=default.target
