@@ -1,4 +1,4 @@
-from archive_bakeoff.preprocess import parse_multipart, sanitize_title, strip_multipart
+from onenote_archive.preprocess import parse_multipart, sanitize_title, strip_multipart
 
 
 def test_strip_multipart_keeps_html():

@@ -4,7 +4,7 @@ import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 
-from archive_bakeoff.preprocess import himetric_to_px
+from onenote_archive.preprocess import himetric_to_px
 
 INKML_NS = "http://www.w3.org/2003/InkML"
 NS = {"inkml": INKML_NS}

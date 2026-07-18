@@ -12,7 +12,7 @@ from archive_bakeoff.preprocess import (
     remove_inkml,
     rewrite_asset_prefix,
 )
-from archive_bakeoff.path_c import _ensure_body_size, _inject_after_body
+from onenote_archive.render_a import _ensure_body_size, _inject_after_body
 
 BANNER = """
 <div id="bakeoff-banner" style="position:relative;z-index:9999;background:#0b3d2e;color:#f5f5f5;padding:10px 14px;font:14px/1.4 system-ui,sans-serif;">
