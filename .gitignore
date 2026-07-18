@@ -165,3 +165,6 @@ inkml_parser/img/
 
 *.db
 *.tar
+
+# Bake-off archival outputs (large binaries)
+/archive/
