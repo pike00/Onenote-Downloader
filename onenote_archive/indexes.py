@@ -7,6 +7,43 @@ from pathlib import Path
 from onenote_archive.catalog import PageRef
 from onenote_archive.preprocess import sanitize_title
 
+_DISCOVERED_ID = "discovered"
+
+
+def discover_archived_pages(archive_root: Path) -> list[tuple[PageRef, Path]]:
+    """Scan archive_root for notebook/section/page/page.html entries."""
+    if not archive_root.is_dir():
+        return []
+
+    discovered: list[tuple[PageRef, Path]] = []
+    for page_html in archive_root.rglob("page.html"):
+        try:
+            rel = page_html.relative_to(archive_root)
+        except ValueError:
+            continue
+        if rel.parts and rel.parts[0] == "_bakeoff":
+            continue
+        if len(rel.parts) != 4:
+            continue
+
+        nb_slug, sec_slug, page_slug, _ = rel.parts
+        dest_dir = page_html.parent
+        discovered.append(
+            (
+                PageRef(
+                    notebook_id=_DISCOVERED_ID,
+                    section_id=_DISCOVERED_ID,
+                    page_id=_DISCOVERED_ID,
+                    notebook_name=nb_slug,
+                    section_name=sec_slug,
+                    page_title=page_slug,
+                    page_html=page_html,
+                ),
+                dest_dir,
+            )
+        )
+    return discovered
+
 _STYLE = """
 body { font-family: system-ui, -apple-system, sans-serif; max-width: 48rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; color: #1a1a1a; }
 h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
@@ -43,8 +80,14 @@ def write_indexes(
     if len(pages) != len(dest_dirs):
         raise ValueError("pages and dest_dirs must have the same length")
 
-    by_notebook: dict[str, list[tuple[PageRef, Path]]] = defaultdict(list)
+    merged: dict[Path, tuple[PageRef, Path]] = {}
+    for ref, dest_dir in discover_archived_pages(archive_root):
+        merged[dest_dir.resolve()] = (ref, dest_dir)
     for ref, dest_dir in zip(pages, dest_dirs, strict=True):
+        merged[dest_dir.resolve()] = (ref, dest_dir)
+
+    by_notebook: dict[str, list[tuple[PageRef, Path]]] = defaultdict(list)
+    for ref, dest_dir in merged.values():
         by_notebook[ref.notebook_name].append((ref, dest_dir))
 
     root_items: list[str] = []

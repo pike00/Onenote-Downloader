@@ -55,6 +55,34 @@ def test_write_indexes_root_and_notebook(tmp_path):
     assert nb_index.index("First Page") < nb_index.index("Second Page")
 
 
+def test_write_indexes_merges_discovered_pages(tmp_path):
+    archive = tmp_path / "archive"
+    page_a = archive / "Alpha-Notebook" / "Section-One" / "First-Page"
+    page_b = archive / "Beta-Notebook" / "Section-Two" / "Second-Page"
+    page_a.mkdir(parents=True)
+    page_b.mkdir(parents=True)
+    (page_a / "page.html").write_text("<html></html>", encoding="utf-8")
+    (page_b / "page.html").write_text("<html></html>", encoding="utf-8")
+
+    ref_a = _ref(
+        notebook_name="Alpha Notebook",
+        section_name="Section One",
+        page_title="First Page",
+        page_id="p1",
+    )
+    write_indexes(archive, [ref_a], [page_a])
+
+    root = (archive / "index.html").read_text(encoding="utf-8")
+    assert 'href="Alpha-Notebook/index.html"' in root
+    assert "Alpha Notebook" in root
+    assert 'href="Beta-Notebook/index.html"' in root
+    assert "Beta-Notebook" in root
+
+    beta_index = (archive / "Beta-Notebook" / "index.html").read_text(encoding="utf-8")
+    assert "Section-Two" in beta_index
+    assert 'href="Section-Two/Second-Page/page.html"' in beta_index
+
+
 def test_write_indexes_escapes_html_in_titles(tmp_path):
     archive = tmp_path / "archive"
     notebook_name = 'Evil <script>alert("x")</script>'
