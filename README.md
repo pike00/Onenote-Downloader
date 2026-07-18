@@ -18,7 +18,29 @@ Microsoft provides [Microsoft Graph](https://developer.microsoft.com/en-us/graph
 ### InkML
 OneNote saves ink annotations as [InkML](https://www.w3.org/TR/InkML/), which currently has a specification from W3C as of 2011-09-20, so quite out dated. I have not managed to find any javascript libraries that can render this code, so I have tried to write my own (incomplete).
 
+## Archival
 
+1. **Sync** — download all notebooks from Microsoft Graph into `out/`:
+
+   ```bash
+   uv run onenote_dl/download_onenote.py
+   # optional filter (substring, case-insensitive):
+   ONENOTE_NOTEBOOK_FILTER="01 sfi" uv run onenote_dl/download_onenote.py
+   uv run onenote_dl/download_onenote.py --notebook "01 sfi"
+   ```
+
+2. **Archive** — render the Graph cache into readable HTML/PDF under `archive/`:
+
+   ```bash
+   uv run onenote_archive/run_archive.py
+   uv run onenote_archive/run_archive.py --notebook "01 sfi" --skip-pdf --force
+   ```
+
+   PDF export requires Chromium for Playwright (one-time install):
+
+   ```bash
+   uv run --with playwright playwright install chromium
+   ```
 
 ## Todo
 

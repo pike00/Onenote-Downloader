@@ -1,14 +1,35 @@
+import argparse
 import re
+import signal
+import socket
 import subprocess
+import sys
+import threading
 from os import makedirs
 from os.path import join
 
 from furl import furl
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from tqdm import tqdm
 
 import definitions
 from onenote_dl.db_helper import parseJSON, OneNoteType
 from onenote_dl.helpers import get_json_notebook_section, get_json_page, get_binary_file, get_html
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="ONENOTE_", extra="ignore")
+
+    notebook_filter: str = Field(default="", description="Sync only notebooks whose name contains this substring")
+
+# tqdm defaults to a multiprocessing.RLock for cross-process write locking.
+# That registers a semaphore with multiprocessing.resource_tracker; a SIGTERM
+# mid-download (systemd restart / pkill) then warns:
+#   resource_tracker: There appear to be 1 leaked semaphore objects...
+# We only ever run a single process, so a threading lock is correct and leak-free.
+tqdm.set_lock(threading.RLock())
+
 
 def send_mattermost_message(message):
     escaped_message = message.replace('"', '\\"')
@@ -34,73 +55,105 @@ TOKEN_ID=$(docker exec mattermost mmctl token list janet --local 2>&1 \
 [ -n "$TOKEN_ID" ] && docker exec mattermost mmctl token revoke "$TOKEN_ID" --local
 """
     try:
-        subprocess.run(["ssh", "ares", "bash -s"], input=bash_script.encode('utf-8'), capture_output=True, check=True)
+        # On ares Mattermost is local; elsewhere hop via ssh.
+        if socket.gethostname().split(".")[0] == "ares":
+            subprocess.run(["bash", "-s"], input=bash_script.encode("utf-8"), capture_output=True, check=True)
+        else:
+            subprocess.run(["ssh", "ares", "bash -s"], input=bash_script.encode("utf-8"), capture_output=True, check=True)
     except Exception as e:
         print(f"Failed to send Mattermost notification: {e}", flush=True)
 
-try:
-    f = furl(definitions.GRAPH_URL)
-    f /= "notebooks"
 
-    # Download and write the notebooks json to the onenote_dl json folder
-    notebooks_js = get_json_notebook_section(join(definitions.OUT_DIR, "notebooks.json"), f.url)
+def main(notebook_filter: str = ""):
+    # Exit cleanly on systemd stop / Ctrl-C so tqdm can tear down without warnings.
+    def _handle_stop(signum, _frame):
+        print(f"\nReceived signal {signum}; shutting down cleanly.", flush=True)
+        sys.exit(0)
 
-    for notebook_js in notebooks_js:
-        notebook = parseJSON(json_content=notebook_js, objectType=OneNoteType.NOTEBOOK)
-        if "01 sfi" not in notebook.displayName.lower():
-            continue
-            
-        send_mattermost_message(f"🚀 OneNote Downloader: Starting sync for notebook *{notebook.displayName}*")
-        print(f"\n\n------NOTEBOOK: {notebook.displayName}------")
+    signal.signal(signal.SIGTERM, _handle_stop)
+    signal.signal(signal.SIGINT, _handle_stop)
 
-        # Create notebook directory within JSON directory
-        notebook_dir = join(definitions.OUT_DIR, notebook.id)
-        makedirs(notebook_dir, exist_ok=True)
+    try:
+        f = furl(definitions.GRAPH_URL)
+        f /= "notebooks"
 
-        # Download and save each subsection url and related json
-        sections_js = get_json_notebook_section(join(notebook_dir, "sections.json"),
-                                                notebook_js['sectionsUrl'])
+        notebooks_js = get_json_notebook_section(join(definitions.OUT_DIR, "notebooks.json"), f.url)
 
-        # Loop over each section
-        for section_js in sections_js:
-            section = parseJSON(section_js, OneNoteType.SECTION)
-            print(f"{notebook.displayName} > {section.displayName} (ID: {section.id})")
-            send_mattermost_message(f"🔄 OneNote Downloader: Syncing section *{section.displayName}*")
+        filt = notebook_filter.strip().lower()
 
-            # Create section directory within each notebook directory
-            section_dir = join(notebook_dir, section.id)
-            makedirs(section_dir, exist_ok=True)
+        for notebook_js in notebooks_js:
+            notebook = parseJSON(json_content=notebook_js, objectType=OneNoteType.NOTEBOOK)
+            if filt and filt not in notebook.displayName.lower():
+                continue
 
-            # Download and Save pages json for each section
-            pages_js = get_json_page(join(section_dir, "pages.json"), section_js['pagesUrl'])
-            
-            # Loop over each page within each section
-            for page_js in pages_js:
-                page = parseJSON(page_js, OneNoteType.PAGE)
-                contentUrl = page_js['contentUrl']
+            send_mattermost_message(f"🚀 OneNote Downloader: Starting sync for notebook *{notebook.displayName}*")
+            print(f"\n\n------NOTEBOOK: {notebook.displayName}------")
 
-                # Create a page directory for assets
-                page_dir = join(section_dir, page.id)
-                makedirs(page_dir, exist_ok=True)
+            notebook_dir = join(definitions.OUT_DIR, notebook.id)
+            makedirs(notebook_dir, exist_ok=True)
 
-                page_filename = join(page_dir, "page.html")
-                page_html = get_html(page_filename, contentUrl + f"?includeinkML=true")
+            sections_js = get_json_notebook_section(
+                join(notebook_dir, "sections.json"),
+                notebook_js["sectionsUrl"],
+            )
 
-                # Find resource urls within each page (Includes images)
-                asset_urls = re.findall(r'"(https?://graph\.microsoft.com.+?\$value)"', page_html)
+            for section_js in sections_js:
+                section = parseJSON(section_js, OneNoteType.SECTION)
+                print(f"{notebook.displayName} > {section.displayName} (ID: {section.id})")
+                send_mattermost_message(f"🔄 OneNote Downloader: Syncing section *{section.displayName}*")
 
-                if len(asset_urls) == 0:
-                    continue
+                section_dir = join(notebook_dir, section.id)
+                makedirs(section_dir, exist_ok=True)
 
-                for asset_url in tqdm(asset_urls, desc=f"{page.displayName[0:35]:>40}", ncols=100, unit="files"):
-                    uuid = asset_url.split("/")[7]
-                    asset_filename = join(page_dir, uuid)
-                    get_binary_file(asset_filename, asset_url)
+                pages_js = get_json_page(join(section_dir, "pages.json"), section_js["pagesUrl"])
 
-            send_mattermost_message(f"📁 OneNote Downloader: Finished section *{section.displayName}*")
+                for page_js in pages_js:
+                    page = parseJSON(page_js, OneNoteType.PAGE)
+                    contentUrl = page_js["contentUrl"]
 
-        send_mattermost_message(f"✅ OneNote Downloader: Sync successfully completed for *{notebook.displayName}*!")
+                    page_dir = join(section_dir, page.id)
+                    makedirs(page_dir, exist_ok=True)
 
-except Exception as e:
-    send_mattermost_message(f"❌ OneNote Downloader: Sync CRASHED with error: `{e}`")
-    raise e
+                    page_filename = join(page_dir, "page.html")
+                    page_html = get_html(page_filename, contentUrl + "?includeinkML=true")
+
+                    asset_urls = re.findall(
+                        r'"(https?://graph\.microsoft.com.+?\$value)"',
+                        page_html,
+                    )
+
+                    if len(asset_urls) == 0:
+                        continue
+
+                    for asset_url in tqdm(
+                        asset_urls,
+                        desc=f"{page.displayName[0:35]:>40}",
+                        ncols=100,
+                        unit="files",
+                    ):
+                        uuid = asset_url.split("/")[7]
+                        asset_filename = join(page_dir, uuid)
+                        get_binary_file(asset_filename, asset_url)
+
+                send_mattermost_message(f"📁 OneNote Downloader: Finished section *{section.displayName}*")
+
+            send_mattermost_message(
+                f"✅ OneNote Downloader: Sync successfully completed for *{notebook.displayName}*!"
+            )
+
+    except Exception as e:
+        send_mattermost_message(f"❌ OneNote Downloader: Sync CRASHED with error: `{e}`")
+        raise e
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Sync OneNote notebooks from Microsoft Graph.")
+    parser.add_argument(
+        "--notebook",
+        metavar="SUBSTR",
+        help="Only sync notebooks whose name contains SUBSTR (overrides ONENOTE_NOTEBOOK_FILTER)",
+    )
+    args = parser.parse_args()
+    settings = Settings()
+    filt = (args.notebook or settings.notebook_filter).strip()
+    main(notebook_filter=filt)
