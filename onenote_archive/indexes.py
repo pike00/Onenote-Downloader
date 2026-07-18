@@ -1,13 +1,28 @@
 from __future__ import annotations
 
-from collections import defaultdict
+from dataclasses import dataclass, field
 from html import escape
 from pathlib import Path
 
 from onenote_archive.catalog import PageRef
-from onenote_archive.preprocess import sanitize_title
 
 _DISCOVERED_ID = "discovered"
+
+
+def _is_discovered(ref: PageRef) -> bool:
+    return ref.page_id == _DISCOVERED_ID
+
+
+@dataclass
+class _SectionGroup:
+    display: str
+    pages: list[tuple[PageRef, Path]] = field(default_factory=list)
+
+
+@dataclass
+class _NotebookGroup:
+    display: str
+    sections: dict[str, _SectionGroup] = field(default_factory=dict)
 
 
 def discover_archived_pages(archive_root: Path) -> list[tuple[PageRef, Path]]:
@@ -86,25 +101,41 @@ def write_indexes(
     for ref, dest_dir in zip(pages, dest_dirs, strict=True):
         merged[dest_dir.resolve()] = (ref, dest_dir)
 
-    by_notebook: dict[str, list[tuple[PageRef, Path]]] = defaultdict(list)
+    by_notebook: dict[str, _NotebookGroup] = {}
     for ref, dest_dir in merged.values():
-        by_notebook[ref.notebook_name].append((ref, dest_dir))
+        rel = dest_dir.relative_to(archive_root)
+        if len(rel.parts) < 3:
+            continue
+        nb_slug = rel.parts[0]
+        nb_dir = archive_root / nb_slug
+        sec_slug = dest_dir.relative_to(nb_dir).parts[0]
+
+        if nb_slug not in by_notebook:
+            by_notebook[nb_slug] = _NotebookGroup(display=ref.notebook_name)
+        elif not _is_discovered(ref):
+            by_notebook[nb_slug].display = ref.notebook_name
+
+        nb_group = by_notebook[nb_slug]
+        if sec_slug not in nb_group.sections:
+            nb_group.sections[sec_slug] = _SectionGroup(display=ref.section_name)
+        elif not _is_discovered(ref):
+            nb_group.sections[sec_slug].display = ref.section_name
+
+        nb_group.sections[sec_slug].pages.append((ref, dest_dir))
 
     root_items: list[str] = []
-    for notebook_name in sorted(by_notebook, key=str.casefold):
-        entries = by_notebook[notebook_name]
-        nb_slug = sanitize_title(notebook_name)
+    for nb_slug in sorted(by_notebook, key=str.casefold):
+        nb_group = by_notebook[nb_slug]
+        notebook_name = nb_group.display
         nb_dir = archive_root / nb_slug
         nb_dir.mkdir(parents=True, exist_ok=True)
 
-        by_section: dict[str, list[tuple[PageRef, Path]]] = defaultdict(list)
-        for ref, dest_dir in entries:
-            by_section[ref.section_name].append((ref, dest_dir))
-
         section_blocks: list[str] = []
-        for section_name in sorted(by_section, key=str.casefold):
+        for sec_slug in sorted(nb_group.sections, key=str.casefold):
+            sec_group = nb_group.sections[sec_slug]
+            section_name = sec_group.display
             section_entries = sorted(
-                by_section[section_name],
+                sec_group.pages,
                 key=lambda item: item[0].page_title.casefold(),
             )
             links = []

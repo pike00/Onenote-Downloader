@@ -1,7 +1,14 @@
 from pathlib import Path
+from unittest.mock import patch
 
+from onenote_archive.catalog import PageRef
 from onenote_archive.preprocess import prepare_page
-from onenote_archive.render_a import render_path_a
+from onenote_archive.render_a import RenderResult, render_path_a
+from onenote_archive.run_archive import (
+    PAGE_ID_MARKER,
+    _process_page,
+    resolve_dest_dir,
+)
 
 
 def test_prepare_page_writes_assets_and_inkml(tmp_path):
@@ -83,3 +90,63 @@ def test_render_path_a_injects_ink_canvas(tmp_path):
     assert 'id="inkml-data"' in html
     assert "ink_render.js" in html
     assert "<!-- inkml extracted; not rendered in this path -->" in html
+
+
+def _page_ref(tmp_path: Path) -> PageRef:
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    page_html = origin / "page.html"
+    page_html.write_text(
+        "--bound\nContent-Type: text/html\n\n"
+        "<html><head><title>Retry Page</title></head><body><p>hi</p></body></html>\n"
+        "--bound--",
+        encoding="utf-8",
+    )
+    return PageRef(
+        notebook_id="nb",
+        section_id="sec",
+        page_id="page-abc12345",
+        notebook_name="Notebook",
+        section_name="Section",
+        page_title="Retry Page",
+        page_html=page_html,
+    )
+
+
+def test_process_page_writes_page_id_before_render(tmp_path):
+    archive = tmp_path / "archive"
+    ref = _page_ref(tmp_path)
+    dest = archive / "Notebook" / "Section" / "Retry-Page"
+    failures_log = archive / "failures.log"
+
+    with patch(
+        "onenote_archive.run_archive.render_path_a",
+        return_value=RenderResult(ok=False, html=dest / "page.html", pdf=None, error="pdf failed"),
+    ):
+        outcome = _process_page(
+            ref,
+            dest,
+            archive,
+            skip_pdf=False,
+            force=False,
+            failures_log=failures_log,
+        )
+
+    assert outcome == "fail"
+    assert (dest / PAGE_ID_MARKER).read_text(encoding="utf-8") == ref.page_id
+    assert (dest / "page.html").is_file()
+
+
+def test_resolve_dest_dir_reuses_marked_dir_on_retry(tmp_path):
+    archive = tmp_path / "archive"
+    ref = _page_ref(tmp_path)
+    dest = archive / "Notebook" / "Section" / "Retry-Page"
+    dest.mkdir(parents=True)
+    (dest / "page.html").write_text("<html></html>", encoding="utf-8")
+    (dest / PAGE_ID_MARKER).write_text(ref.page_id, encoding="utf-8")
+
+    claimed: dict[Path, str] = {}
+    resolved = resolve_dest_dir(archive, ref, claimed)
+
+    assert resolved == dest
+    assert claimed[dest] == ref.page_id

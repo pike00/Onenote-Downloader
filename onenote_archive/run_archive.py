@@ -107,8 +107,13 @@ def _process_page(
 ) -> str:
     rel = dest_dir.relative_to(archive_root)
     if should_skip(dest_dir, skip_pdf=skip_pdf, force=force):
+        if _read_stored_page_id(dest_dir) is None:
+            _write_page_id(dest_dir, ref.page_id)
         print(f"skip  {rel}")
         return "skip"
+
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    _write_page_id(dest_dir, ref.page_id)
 
     try:
         prepared = prepare_page(ref.page_html, dest_dir)
@@ -118,7 +123,6 @@ def _process_page(
             print(f"FAIL  {rel}: {result.error}")
             return "fail"
 
-        _write_page_id(dest_dir, ref.page_id)
         print(f"ok    {rel}")
         return "ok"
     except Exception as exc:  # noqa: BLE001

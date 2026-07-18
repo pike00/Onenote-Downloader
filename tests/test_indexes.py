@@ -83,6 +83,32 @@ def test_write_indexes_merges_discovered_pages(tmp_path):
     assert 'href="Section-Two/Second-Page/page.html"' in beta_index
 
 
+def test_write_indexes_groups_by_path_slug_not_display_name(tmp_path):
+    archive = tmp_path / "archive"
+    page_dir = archive / "01-SFI" / "Week-One" / "Intro"
+    page_dir.mkdir(parents=True)
+    (page_dir / "page.html").write_text("<html></html>", encoding="utf-8")
+
+    ref = _ref(
+        notebook_name="01 SFI",
+        section_name="Week One",
+        page_title="Intro",
+        page_id="p1",
+    )
+    write_indexes(archive, [ref], [page_dir])
+
+    root = (archive / "index.html").read_text(encoding="utf-8")
+    assert root.count('href="01-SFI/index.html"') == 1
+    assert "01 SFI" in root
+    assert "01-SFI" not in root.replace('href="01-SFI/index.html"', "")
+
+    nb_index = (archive / "01-SFI" / "index.html").read_text(encoding="utf-8")
+    assert nb_index.count("<h2>") == 1
+    assert "<h2>Week One</h2>" in nb_index
+    assert "<h2>Week-One</h2>" not in nb_index
+    assert 'href="Week-One/Intro/page.html"' in nb_index
+
+
 def test_write_indexes_escapes_html_in_titles(tmp_path):
     archive = tmp_path / "archive"
     notebook_name = 'Evil <script>alert("x")</script>'
